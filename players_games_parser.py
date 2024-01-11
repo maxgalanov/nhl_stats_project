@@ -109,13 +109,20 @@ def players_info_to_dwh(**kwargs):
     try:
         df_teams_roster_old = spark.read.parquet(DWH_PATH + f"players_info")
 
-        df_old_players = df_teams_roster_old.join(df_teams_roster_new, df_teams_roster_old.id_player == df_teams_roster_new.id_player, 'leftanti')
+        df_old_players = df_teams_roster_old.join(
+            df_teams_roster_new,
+            df_teams_roster_old.id_player == df_teams_roster_new.id_player,
+            "leftanti",
+        )
         df_all_players = df_teams_roster_new.union(df_old_players)
 
-        df_all_players.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"players_info")
+        df_all_players.repartition(1).write.mode("overwrite").parquet(
+            DWH_PATH + f"players_info"
+        )
     except:
-        df_teams_roster_new.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"players_info")
-
+        df_teams_roster_new.repartition(1).write.mode("overwrite").parquet(
+            DWH_PATH + f"players_info"
+        )
 
 
 task_get_players_info = PythonOperator(
