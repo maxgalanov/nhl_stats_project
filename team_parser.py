@@ -26,6 +26,8 @@ dag = DAG(
     description="ETL process for getting list of NHL teams yearly before every season",
 )
 
+RAW_PATH = '/opt/hadoop/airflow/dags/galanov/nhl_stats_project/data/raw/'
+
 
 def get_teams():
     spark = SparkSession.builder.master("local[*]").appName("parse_teams").getOrCreate()
@@ -36,7 +38,7 @@ def get_teams():
     df_teams = spark.createDataFrame(df_teams_pd)
     df_teams = df_teams.select(col("id"), col("fullName"), col("triCode"))
 
-    df_teams.repartition(1).write.mode("overwrite").parquet(f"/user/maxglnv/teams")
+    df_teams.repartition(1).write.mode("overwrite").parquet(RAW_PATH + 'teams')
 
 
 task_get_teams = PythonOperator(
