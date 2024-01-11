@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append("/opt/hadoop/airflow/dags/nhl_stats_project/py_scripts")
+sys.path.append("/opt/hadoop/airflow/dags/galanov/nhl_stats_project/py_scripts")
 
 import py_scripts.tools as tools
 import pandas as pd
