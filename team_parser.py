@@ -1,11 +1,16 @@
-import pandas as pd
+import sys
+
+sys.path.append("/opt/hadoop/airflow/dags/nhl_stats_project/py_scripts")
+
 import py_scripts.tools as tools
+import pandas as pd
 from airflow.models import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from datetime import timedelta
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
+
 
 DEFAULT_ARGS = {
     "owner": "Maxim Galanov",
@@ -26,12 +31,12 @@ dag = DAG(
     description="ETL process for getting list of NHL teams yearly before every season",
 )
 
-RAW_PATH = '/user/maxglnv/data/raw/'
-DWH_PATH = '/user/maxglnv/data/dwh/'
+RAW_PATH = "/user/maxglnv/data/raw/"
+DWH_PATH = "/user/maxglnv/data/dwh/"
 
 
 def get_teams(**kwargs):
-    current_date = kwargs['ds']
+    current_date = kwargs["ds"]
 
     spark = SparkSession.builder.master("local[*]").appName("parse_teams").getOrCreate()
 
@@ -39,18 +44,22 @@ def get_teams(**kwargs):
     df_teams_pd = pd.DataFrame(data_teams["data"])
     df_teams = spark.createDataFrame(df_teams_pd)
 
-    df_teams.repartition(1).write.mode("overwrite").parquet(RAW_PATH + f'teams/{current_date}')
+    df_teams.repartition(1).write.mode("overwrite").parquet(
+        RAW_PATH + f"teams/{current_date}"
+    )
 
 
 def teams_to_dwh(**kwargs):
-    current_date = kwargs['ds']
+    current_date = kwargs["ds"]
 
-    spark = SparkSession.builder.master("local[*]").appName("teams_to_dwh").getOrCreate()
+    spark = (
+        SparkSession.builder.master("local[*]").appName("teams_to_dwh").getOrCreate()
+    )
 
-    df_teams = spark.read.parquet(RAW_PATH + f'teams/{current_date}')
+    df_teams = spark.read.parquet(RAW_PATH + f"teams/{current_date}")
     df_teams = df_teams.select(col("id"), col("fullName"), col("triCode"))
 
-    df_teams.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f'teams')
+    df_teams.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"teams")
 
 
 task_get_teams = PythonOperator(

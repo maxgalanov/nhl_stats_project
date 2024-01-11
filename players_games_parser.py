@@ -1,5 +1,9 @@
-import pandas as pd
+import sys
+
+sys.path.append("/opt/hadoop/airflow/dags/nhl_stats_project/py_scripts")
+
 import py_scripts.tools as tools
+import pandas as pd
 from airflow.models import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
@@ -26,44 +30,60 @@ dag = DAG(
     description="ETL process for getting NHL players atributes and games they played",
 )
 
-RAW_PATH = '/opt/hadoop/airflow/dags/galanov/nhl_stats_project/data/raw/'
+RAW_PATH = "/user/maxglnv/data/raw/"
+DWH_PATH = "/user/maxglnv/data/dwh/"
+
 
 def get_players_info(**kwargs):
-    current_date = kwargs['ds']
+    current_date = kwargs["ds"]
 
-    spark = SparkSession.builder.master("local[*]").appName("parse_players_info").getOrCreate()
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("parse_players_info")
+        .getOrCreate()
+    )
 
-    df_teams = spark.read.parquet(RAW_PATH + 'teams')
+    df_teams = spark.read.parquet(RAW_PATH + "teams")
 
-    triCode_lst = df_teams.select(col('triCode')).rdd.flatMap(lambda x: x).collect()
+    triCode_lst = df_teams.select(col("triCode")).rdd.flatMap(lambda x: x).collect()
 
     teams_roster = pd.DataFrame()
 
     for code in triCode_lst:
         try:
-            team = tools.get_information(f'/v1/roster/{code}/current')
+            team = tools.get_information(f"/v1/roster/{code}/current")
             players_lst = []
-            
+
             for key, value in team.items():
                 players_lst.extend(value)
 
             df_team = pd.DataFrame(players_lst)
-            df_team['triCodeCurrent'] = code
+            df_team["triCodeCurrent"] = code
 
             teams_roster = pd.concat([teams_roster, df_team], ignore_index=True)
         except:
             continue
 
     # Вытаскиваем данные из json
-    teams_roster['firstName'] = teams_roster['firstName'].apply(lambda x: x.get('default', '') if type(x) == dict else '')
-    teams_roster['lastName'] = teams_roster['lastName'].apply(lambda x: x.get('default', '') if type(x) == dict else '')
-    teams_roster['birthCity'] = teams_roster['birthCity'].apply(lambda x: x.get('default', '') if type(x) == dict else '')
-    teams_roster['birthStateProvince'] = teams_roster['birthStateProvince'].apply(lambda x: x.get('default', '') if type(x) == dict else '')
-    teams_roster.rename(columns={'id': 'id_player'}, inplace=True)
+    teams_roster["firstName"] = teams_roster["firstName"].apply(
+        lambda x: x.get("default", "") if type(x) == dict else ""
+    )
+    teams_roster["lastName"] = teams_roster["lastName"].apply(
+        lambda x: x.get("default", "") if type(x) == dict else ""
+    )
+    teams_roster["birthCity"] = teams_roster["birthCity"].apply(
+        lambda x: x.get("default", "") if type(x) == dict else ""
+    )
+    teams_roster["birthStateProvince"] = teams_roster["birthStateProvince"].apply(
+        lambda x: x.get("default", "") if type(x) == dict else ""
+    )
+    teams_roster.rename(columns={"id": "id_player"}, inplace=True)
 
     df_teams_roster = spark.createDataFrame(teams_roster)
 
-    df_teams_roster.repartition(1).write.mode("overwrite").parquet(RAW_PATH + 'players_info/' + current_date)
+    df_teams_roster.repartition(1).write.mode("overwrite").parquet(
+        RAW_PATH + "players_info/" + current_date
+    )
 
 
 task_get_teams = PythonOperator(
@@ -72,4 +92,4 @@ task_get_teams = PythonOperator(
     dag=dag,
 )
 
-task_get_teams
+# task_get_teams
