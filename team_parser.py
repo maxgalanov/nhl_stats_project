@@ -1,9 +1,5 @@
-import sys
-
-sys.path.append("/opt/hadoop/airflow/dags/galanov/nhl_stats_project/py_scripts")
-
-import py_scripts.tools as tools
 import pandas as pd
+import requests
 from airflow.models import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
@@ -35,12 +31,26 @@ RAW_PATH = "/user/maxglnv/data/raw/"
 DWH_PATH = "/user/maxglnv/data/dwh/"
 
 
+def get_information(endpoint, base_url="https://api-web.nhle.com"):
+    base_url = f"{base_url}"
+    endpoint = f"{endpoint}"
+    full_url = f"{base_url}{endpoint}"
+
+    response = requests.get(full_url)
+
+    if response.status_code == 200:
+        player_data = response.json()
+        return player_data
+    else:
+        print(f"Error: Unable to fetch data. Status code: {response.status_code}")
+
+
 def get_teams(**kwargs):
     current_date = kwargs["ds"]
 
     spark = SparkSession.builder.master("local[*]").appName("parse_teams").getOrCreate()
 
-    data_teams = tools.get_information("en/team", "https://api.nhle.com/stats/rest/")
+    data_teams = get_information("en/team", "https://api.nhle.com/stats/rest/")
     df_teams_pd = pd.DataFrame(data_teams["data"])
     df_teams = spark.createDataFrame(df_teams_pd)
 
