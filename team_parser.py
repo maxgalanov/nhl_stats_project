@@ -26,8 +26,8 @@ dag = DAG(
     description="ETL process for getting list of NHL teams yearly before every season",
 )
 
-RAW_PATH = '/opt/hadoop/airflow/dags/galanov/nhl_stats_project/data/raw/'
-DWH_PATH = '/opt/hadoop/airflow/dags/galanov/nhl_stats_project/data/dwh/'
+RAW_PATH = '/user/maxglnv/data/raw/'
+DWH_PATH = '/user/maxglnv/data/dwh/'
 
 
 def get_teams(**kwargs):
