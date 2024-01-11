@@ -53,8 +53,7 @@ def get_players_info(**kwargs):
         .getOrCreate()
     )
 
-    df_teams = spark.read.parquet(RAW_PATH + "teams")
-
+    df_teams = spark.read.parquet(DWH_PATH + "teams")
     triCode_lst = df_teams.select(col("triCode")).rdd.flatMap(lambda x: x).collect()
 
     teams_roster = pd.DataFrame()
@@ -96,10 +95,39 @@ def get_players_info(**kwargs):
     )
 
 
-task_get_teams = PythonOperator(
-    task_id="get_teams",
-    python_callable=get_teams,
+def players_info_to_dwh(**kwargs):
+    current_date = kwargs["ds"]
+
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("parse_players_info")
+        .getOrCreate()
+    )
+
+    df_teams_roster_new = spark.read.parquet(RAW_PATH + f"players_info/{current_date}")
+
+    try:
+        df_teams_roster_old = spark.read.parquet(DWH_PATH + f"players_info")
+
+        df_old_players = df_teams_roster_old.join(df_teams_roster_new, df_teams_roster_old.id_player == df_teams_roster_new.id_player, 'leftanti')
+        df_all_players = df_teams_roster_new.union(df_old_players)
+
+        df_all_players.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"players_info")
+    except:
+        df_teams_roster_new.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"players_info")
+
+
+
+task_get_players_info = PythonOperator(
+    task_id="get_players_info",
+    python_callable=get_players_info,
     dag=dag,
 )
 
-# task_get_teams
+task_players_info_to_dwh = PythonOperator(
+    task_id="players_info_to_dwh",
+    python_callable=players_info_to_dwh,
+    dag=dag,
+)
+
+task_get_players_info >> task_players_info_to_dwh
