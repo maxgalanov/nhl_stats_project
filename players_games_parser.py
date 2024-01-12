@@ -73,7 +73,6 @@ def get_players_info(**kwargs):
         except:
             continue
 
-    # Вытаскиваем данные из json
     teams_roster["firstName"] = teams_roster["firstName"].apply(
         lambda x: x.get("default", "") if type(x) == dict else ""
     )
@@ -86,7 +85,7 @@ def get_players_info(**kwargs):
     teams_roster["birthStateProvince"] = teams_roster["birthStateProvince"].apply(
         lambda x: x.get("default", "") if type(x) == dict else ""
     )
-    teams_roster.rename(columns={"id": "id_player"}, inplace=True)
+    teams_roster.rename(columns={"id": "playerId"}, inplace=True)
 
     df_teams_roster = spark.createDataFrame(teams_roster)
 
@@ -100,7 +99,7 @@ def players_info_to_dwh(**kwargs):
 
     spark = (
         SparkSession.builder.master("local[*]")
-        .appName("parse_players_info")
+        .appName("players_info_to_dwh")
         .getOrCreate()
     )
 
@@ -111,7 +110,7 @@ def players_info_to_dwh(**kwargs):
 
         df_old_players = df_teams_roster_old.join(
             df_teams_roster_new,
-            df_teams_roster_old.id_player == df_teams_roster_new.id_player,
+            "playerId",
             "leftanti",
         )
         df_all_players = df_teams_roster_new.union(df_old_players)
@@ -123,6 +122,72 @@ def players_info_to_dwh(**kwargs):
         df_teams_roster_new.repartition(1).write.mode("overwrite").parquet(
             DWH_PATH + f"players_info"
         )
+
+
+def get_games_info(**kwargs):
+    current_date = kwargs["ds"]
+
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("parse_games_info")
+        .getOrCreate()
+    )
+
+    df_players = spark.read.parquet(DWH_PATH + "players_info")
+    players_lst = df_players.select(col("playerId")).rdd.flatMap(lambda x: x).collect()
+
+    df_games = pd.DataFrame()
+
+    for player in players_lst:
+        try:
+            player_data = get_information(f"/v1/player/{player}/game-log/now")
+            df_player = pd.DataFrame(player_data["gameLog"])
+            df_player["playerId"] = player
+
+            df_games = pd.concat([df_games, df_player], ignore_index=True)
+        except:
+            continue
+
+    df_games["commonName"] = df_games["commonName"].apply(lambda x: x.get("default", "") if type(x) == dict else "")
+    df_games["opponentCommonName"] = df_games["opponentCommonName"].apply(lambda x: x.get("default", "") if type(x) == dict else "")
+    df_games["gameId"] = df_games.gameId.astype("int")
+
+    df_games_info = spark.createDataFrame(df_games)
+
+    df_games_info.repartition(1).write.mode("overwrite").parquet(
+        RAW_PATH + "games_info/" + current_date
+    )
+
+
+def games_info_to_dwh(**kwargs):
+    current_date = kwargs["ds"]
+
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("games_info_to_dwh")
+        .getOrCreate()
+    )
+
+    df_games_info_new = spark.read.parquet(RAW_PATH + f"games_info/{current_date}")
+
+    try:
+        df_games_info_old = spark.read.parquet(DWH_PATH + f"games_info")
+
+        df_old_games = df_games_info_old.join(
+            df_games_info_new,
+            ["playerId", "gameId"],
+            "leftanti",
+        )
+        df_all_games = df_games_info_new.union(df_old_games)
+
+        df_all_games.repartition(1).write.mode("overwrite").parquet(
+            DWH_PATH + f"games_info"
+        )
+    except:
+        df_games_info_new.repartition(1).write.mode("overwrite").parquet(
+            DWH_PATH + f"games_info"
+        )
+
 
 
 task_get_players_info = PythonOperator(
@@ -137,4 +202,16 @@ task_players_info_to_dwh = PythonOperator(
     dag=dag,
 )
 
-task_get_players_info >> task_players_info_to_dwh
+task_get_games_info = PythonOperator(
+    task_id="get_games_info",
+    python_callable=get_games_info,
+    dag=dag,
+)
+
+task_games_info_to_dwh = PythonOperator(
+    task_id="games_info_to_dwh",
+    python_callable=games_info_to_dwh,
+    dag=dag,
+)
+
+task_get_players_info >> task_players_info_to_dwh >> task_get_games_info >> task_games_info_to_dwh
