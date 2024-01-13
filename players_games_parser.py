@@ -5,7 +5,7 @@ from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from datetime import timedelta
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, lit
 
 DEFAULT_ARGS = {
     "owner": "Maxim Galanov",
@@ -88,6 +88,7 @@ def get_players_info(**kwargs):
     teams_roster.rename(columns={"id": "playerId"}, inplace=True)
 
     df_teams_roster = spark.createDataFrame(teams_roster)
+    df_teams_roster = df_teams_roster.withColumn("updatedDt", lit(f"{current_date}"))
 
     df_teams_roster.repartition(1).write.mode("overwrite").parquet(
         RAW_PATH + "players_info/" + current_date
@@ -153,6 +154,7 @@ def get_games_info(**kwargs):
     df_games["gameId"] = df_games.gameId.astype("int")
 
     df_games_info = spark.createDataFrame(df_games)
+    df_games_info = df_games_info.drop(col('commonName'), col('opponentCommonName'))
 
     df_games_info.repartition(1).write.mode("overwrite").parquet(
         RAW_PATH + "games_info/" + current_date
