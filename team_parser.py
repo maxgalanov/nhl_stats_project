@@ -7,7 +7,6 @@ from datetime import timedelta
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 
-
 DEFAULT_ARGS = {
     "owner": "Maxim Galanov",
     "email": "maxglnv@gmail.com",
