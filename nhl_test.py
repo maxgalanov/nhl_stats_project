@@ -17,7 +17,7 @@ DEFAULT_ARGS = {
 }
 
 dag = DAG(
-    dag_id="nhl_players_games",
+    dag_id="nhl_test",
     schedule_interval="0 0 1 10 *",
     start_date=days_ago(2),
     catchup=False,
