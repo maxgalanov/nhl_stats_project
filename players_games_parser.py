@@ -191,6 +191,31 @@ def games_info_to_dwh(**kwargs):
         )
 
 
+def players_games_datamart_dwh(**kwargs):
+
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("games_info_to_dwh")
+        .getOrCreate()
+    )
+
+    df_teams = spark.read.parquet(DWH_PATH + f"teams")
+    df_players_info = spark.read.parquet(DWH_PATH + f"players_info")
+    df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
+
+    df_games_info = df_games_info.join(df_players_info, 'playerId', 'left')\
+                             .drop('headshot')\
+                             .join(df_teams.select('triCode', 'fullName'), df_games_info.teamAbbrev == df_teams.triCode, 'left')\
+                             .drop('triCode').withColumnRenamed('fullName', 'teamFullName')\
+                             .join(df_teams.select('triCode', 'fullName'), df_games_info.opponentAbbrev == df_teams.triCode, 'left')\
+                             .drop('triCode').withColumnRenamed('fullName', 'opponentFullName')\
+                             .join(df_teams.select('triCode', 'fullName'), df_players_info.triCodeCurrent == df_teams.triCode, 'left')\
+                             .drop('triCode').withColumnRenamed('fullName', 'currentFullName')
+
+    df_games_info.repartition(1).write.mode("overwrite").parquet(
+        DWH_PATH + f"players_games_datamart"
+    )
+
 
 task_get_players_info = PythonOperator(
     task_id="get_players_info",
@@ -216,4 +241,11 @@ task_games_info_to_dwh = PythonOperator(
     dag=dag,
 )
 
-task_get_players_info >> task_players_info_to_dwh >> task_get_games_info >> task_games_info_to_dwh
+task_players_games_datamart_dwh = PythonOperator(
+    task_id="players_games_datamart_dwh",
+    python_callable=players_games_datamart_dwh,
+    dag=dag,
+)
+
+
+task_get_players_info >> task_players_info_to_dwh >> task_get_games_info >> task_games_info_to_dwh >> task_players_games_datamart_dwh
