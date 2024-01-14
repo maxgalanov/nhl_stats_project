@@ -5,7 +5,10 @@ from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from datetime import timedelta
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, lit
+from pyspark.sql.functions import col, lit, concat_ws
+from pyspark.sql.window import Window
+import pyspark.sql.functions as sf
+
 
 DEFAULT_ARGS = {
     "owner": "Maxim Galanov",
@@ -154,7 +157,7 @@ def get_games_info(**kwargs):
     df_games["gameId"] = df_games.gameId.astype("int")
 
     df_games_info = spark.createDataFrame(df_games)
-    df_games_info = df_games_info.drop(col('commonName'), col('opponentCommonName'))
+    df_games_info = df_games_info.drop(col("commonName"), col("opponentCommonName"))
 
     df_games_info.repartition(1).write.mode("overwrite").parquet(
         RAW_PATH + "games_info/" + current_date
@@ -203,17 +206,122 @@ def players_games_datamart_dwh(**kwargs):
     df_players_info = spark.read.parquet(DWH_PATH + f"players_info")
     df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
 
-    df_games_info = df_games_info.join(df_players_info, 'playerId', 'left')\
-                             .drop('headshot')\
-                             .join(df_teams.select('triCode', 'fullName'), df_games_info.teamAbbrev == df_teams.triCode, 'left')\
-                             .drop('triCode').withColumnRenamed('fullName', 'teamFullName')\
-                             .join(df_teams.select('triCode', 'fullName'), df_games_info.opponentAbbrev == df_teams.triCode, 'left')\
-                             .drop('triCode').withColumnRenamed('fullName', 'opponentFullName')\
-                             .join(df_teams.select('triCode', 'fullName'), df_players_info.triCodeCurrent == df_teams.triCode, 'left')\
-                             .drop('triCode').withColumnRenamed('fullName', 'currentFullName')
+    df_games_info = df_games_info.join(df_players_info, "playerId", "left")\
+                            .drop("headshot", "commonName", "opponentCommonName")\
+                            .join(df_teams.select("triCode", "fullName"), df_games_info.teamAbbrev == df_teams.triCode, "left")\
+                            .drop("triCode").withColumnRenamed("fullName", "teamFullName")\
+                            .join(df_teams.select("triCode", "fullName"), df_games_info.opponentAbbrev == df_teams.triCode, "left")\
+                            .drop("triCode").withColumnRenamed("fullName", "opponentFullName")\
+                            .join(df_teams.select("triCode", "fullName"), df_players_info.triCodeCurrent == df_teams.triCode, "left")\
+                            .drop("triCode").withColumnRenamed("fullName", "currentTeamFullName")
+    
+    df_games_info = df_games_info.withColumn("playersFIO", concat_ws(" ", col("firstName"), col("lastName")))\
+                            .drop("firstName", "lastName")
 
     df_games_info.repartition(1).write.mode("overwrite").parquet(
         DWH_PATH + f"players_games_datamart"
+    )
+
+
+def convert_to_seconds(time_str):
+    minutes, seconds = map(int, time_str.split(":"))
+    return minutes * 60 + seconds
+
+
+def skaters_agg_dwh(**kwargs):
+
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("skaters_agg_to_dwh")
+        .getOrCreate()
+    )
+
+    df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
+
+    convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
+
+    df_skaters_agg = df_games_info.filter(col("positionCode") != "G")\
+        .withColumn("toi", convert_to_seconds_udf("toi"))\
+        .groupBy(
+            "playerId",
+            "playersFIO",
+            "triCodeCurrent",
+            "currentTeamFullName",
+            "teamAbbrev",
+            "teamFullName",
+            "homeRoadFlag",
+            "birthDate",
+            "birthCity",
+            "birthCountry",
+            "birthStateProvince",
+            "positionCode",
+            "shootsCatches"
+        ).agg(
+            sf.count("gameId").alias("gamesCNT"),
+            sf.sum("goals").alias("goals"),
+            sf.sum("points").alias("points"),
+            sf.sum("plusMinus").alias("plusMinus"),
+            sf.sum("powerPlayGoals").alias("powerPlayGoals"),
+            sf.sum("powerPlayPoints").alias("powerPlayPoints"),
+            sf.sum("gameWinningGoals").alias("gameWinningGoals"),
+            sf.sum("otGoals").alias("otGoals"),
+            sf.sum("shots").alias("shots"),
+            sf.sum("shifts").alias("shifts"),
+            sf.sum("shorthandedGoals").alias("shorthandedGoals"),
+            sf.sum("toi").alias("toi"),
+            sf.sum("pim").alias("pim"),
+        )
+
+    df_skaters_agg = df_skaters_agg.sort(df_skaters_agg.playerId)
+
+    df_skaters_agg.repartition(1).write.mode("overwrite").parquet(
+        DWH_PATH + f"skaters_agg"
+    )
+
+
+def goalies_agg_dwh(**kwargs):
+
+    spark = (
+        SparkSession.builder.master("local[*]")
+        .appName("goalies_agg_to_dwh")
+        .getOrCreate()
+    )
+
+    df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
+
+    convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
+
+    df_goalies_agg = df_games_info.filter(col("positionCode") == "G")\
+        .withColumn("toi", convert_to_seconds_udf("toi"))\
+        .groupBy(
+            "playerId",
+            "playersFIO",
+            "triCodeCurrent",
+            "currentTeamFullName",
+            "teamAbbrev",
+            "teamFullName",
+            "homeRoadFlag",
+            "birthDate",
+            "birthCity",
+            "birthCountry",
+            "birthStateProvince",
+            "positionCode",
+            "shootsCatches"
+        ).agg(
+            sf.count("gameId").alias("gamesCNT"),
+            sf.sum("goals").alias("goals"),
+            sf.sum("gamesStarted").alias("gamesStarted"),
+            sf.sum("shotsAgainst").alias("shotsAgainst"),
+            sf.sum("goalsAgainst").alias("goalsAgainst"),
+            sf.sum("shutouts").alias("shutouts"),
+            sf.sum("toi").alias("toi"),
+            sf.sum("pim").alias("pim"),
+        )
+
+    df_goalies_agg = df_goalies_agg.sort(df_goalies_agg.playerId)
+
+    df_goalies_agg.repartition(1).write.mode("overwrite").parquet(
+        DWH_PATH + f"goalies_agg"
     )
 
 
@@ -247,5 +355,18 @@ task_players_games_datamart_dwh = PythonOperator(
     dag=dag,
 )
 
+task_skaters_agg_dwh = PythonOperator(
+    task_id="skaters_agg_dwh",
+    python_callable=skaters_agg_dwh,
+    dag=dag,
+)
+
+task_goalies_agg_dwh = PythonOperator(
+    task_id="goalies_agg_dwh",
+    python_callable=goalies_agg_dwh,
+    dag=dag,
+)
+
 
 task_get_players_info >> task_players_info_to_dwh >> task_get_games_info >> task_games_info_to_dwh >> task_players_games_datamart_dwh
+task_players_games_datamart_dwh >> [task_skaters_agg_dwh, task_goalies_agg_dwh]
