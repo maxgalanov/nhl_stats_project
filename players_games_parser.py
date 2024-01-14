@@ -237,6 +237,7 @@ def skaters_agg_dwh(**kwargs):
     )
 
     df_players_games_datamart = spark.read.parquet(DWH_PATH + f"players_games_datamart")
+    df_players_games_datamart.show()
 
     convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
 
@@ -273,6 +274,8 @@ def skaters_agg_dwh(**kwargs):
         )
 
     df_skaters_agg = df_skaters_agg.sort(df_skaters_agg.playerId)
+
+    df_skaters_agg.show()
 
     df_skaters_agg.repartition(1).write.mode("overwrite").parquet(
         DWH_PATH + f"skaters_agg"
