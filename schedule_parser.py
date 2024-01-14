@@ -57,8 +57,8 @@ def get_info_pandas(req):
          'date_play': date_play}
     df = pd.DataFrame(d)
     return df
-    
-    
+
+
 def get_shedule(**kwargs):
     
     current_date = kwargs["ds"]
