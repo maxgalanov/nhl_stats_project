@@ -223,11 +223,6 @@ def players_games_datamart_dwh(**kwargs):
     )
 
 
-def convert_to_seconds(time_str):
-    minutes, seconds = map(int, time_str.split(":"))
-    return minutes * 60 + seconds
-
-
 def skaters_agg_dwh(**kwargs):
 
     spark = (
@@ -238,6 +233,10 @@ def skaters_agg_dwh(**kwargs):
 
     df_players_games_datamart = spark.read.parquet(DWH_PATH + f"players_games_datamart")
     df_players_games_datamart.show()
+
+    def convert_to_seconds(time_str):
+        minutes, seconds = map(int, time_str.split(":"))
+        return minutes * 60 + seconds
 
     convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
 
@@ -291,6 +290,10 @@ def goalies_agg_dwh(**kwargs):
     )
 
     df_players_games_datamart = spark.read.parquet(DWH_PATH + f"players_games_datamart")
+
+    def convert_to_seconds(time_str):
+        minutes, seconds = map(int, time_str.split(":"))
+        return minutes * 60 + seconds
 
     convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
 
