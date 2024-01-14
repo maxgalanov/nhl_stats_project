@@ -236,11 +236,11 @@ def skaters_agg_dwh(**kwargs):
         .getOrCreate()
     )
 
-    df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
+    df_players_games_datamart = spark.read.parquet(DWH_PATH + f"players_games_datamart")
 
     convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
 
-    df_skaters_agg = df_games_info.filter(col("positionCode") != "G")\
+    df_skaters_agg = df_players_games_datamart.filter(col("positionCode") != "G")\
         .withColumn("toi", convert_to_seconds_udf("toi"))\
         .groupBy(
             "playerId",
@@ -287,11 +287,11 @@ def goalies_agg_dwh(**kwargs):
         .getOrCreate()
     )
 
-    df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
+    df_players_games_datamart = spark.read.parquet(DWH_PATH + f"players_games_datamart")
 
     convert_to_seconds_udf = spark.udf.register("convert_to_seconds", convert_to_seconds)
 
-    df_goalies_agg = df_games_info.filter(col("positionCode") == "G")\
+    df_goalies_agg = df_players_games_datamart.filter(col("positionCode") == "G")\
         .withColumn("toi", convert_to_seconds_udf("toi"))\
         .groupBy(
             "playerId",
