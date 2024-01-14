@@ -6,6 +6,7 @@ from airflow.utils.dates import days_ago
 from datetime import timedelta
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
+import json
 
 DEFAULT_ARGS = {
     "owner": "Maxim Galanov",
@@ -76,7 +77,7 @@ def shedule_to_dwh(**kwargs):
         SparkSession.builder.master("local[*]").appName("shedule_to_dwh").getOrCreate()
     )
     df_shedule = spark.read.parquet(RAW_PATH + f"shedule/{current_date}")
-    df_shedule = df_shedule.select(col("id"), col("away_teams"),\
+    df_shedule = df_shedule.select(col("away_teams"),\
                                    col("home_teams"), col("away_result"), col("home_result"), col("date_play"))
     df_shedule.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"shedule")
 
