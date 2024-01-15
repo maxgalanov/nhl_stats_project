@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import psycopg2
 
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+
 from telebot import asyncio_filters
 from telebot.async_telebot import AsyncTeleBot
 
@@ -28,7 +30,8 @@ class MyStates(StatesGroup):
     skater = State()
     fav_goalie = State()
     fav_skater = State()
-    
+    goalie_game = State()
+    skater_game = State()
 
 
 def gen_df(table):
@@ -120,18 +123,48 @@ async def get_goalies(message):
     await bot.set_state(message.from_user.id, MyStates.goalie, message.chat.id)    
     await bot.send_message(message.chat.id, 'Введите имя вратаря')
 
+    
 @bot.message_handler(state=MyStates.goalie)
+async def get_goalies(message):
+    keys = ["Домашняя", "Выездная"]
+    markup = ReplyKeyboardMarkup(resize_keyboard = True)
+    row = [KeyboardButton(x) for x in keys]
+    markup.add(*row)
+
+    await bot.set_state(message.from_user.id, MyStates.goalie_game, message.chat.id)    
+    await bot.send_message(message.chat.id, 'Домашняя игра или выездная?', reply_markup=markup)
+    
+    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        data['goalie'] = message.text
+
+
+@bot.message_handler(state=MyStates.goalie_game)
 async def name_get(message):
     
+    home_game = {}
+    home_game['Домашняя'] = 'H'
+    home_game['Выездная'] = 'R'
+    
+    print(message.text)
+    
+    markup = telebot.types.ReplyKeyboardRemove()
+    
     df = gen_df('goalies_agg')
-    res = df[df['playersFIO'] == message.text].iloc[1].to_dict()
+    
+    res = ''
+    
+    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        res = df[(df['playersFIO'] == data['goalie']) & (df['homeRoadFlag'] == home_game[message.text])].iloc[0].to_dict()
     ans = 'Дата рождения: ' + res['birthDate'] + '\n'
     ans += 'Страна: ' + res['birthCountry'] + '\n'
     ans += 'Город: ' + res['birthCity'] + '\n'
     ans += 'Игр: ' + str(res['gamesCNT']) + '\n'
     ans += 'Голов: ' + str(res['goals']) + '\n'
     
-    await bot.send_message(message.chat.id, ans)
+    await bot.send_message(message.chat.id, ans, reply_markup=markup)
+    
+    await bot.send_message(message.chat.id, '''Более подробную информация можете посмотреть в нашем [Дэшбордике по игрокам](https://datalens.yandex/xqnhz02g6x6ml)\!''', parse_mode='MarkdownV2')
+    
     await bot.delete_state(message.from_user.id, message.chat.id)
 
 
@@ -140,20 +173,48 @@ async def get_skater(message):
 
     await bot.set_state(message.from_user.id, MyStates.skater, message.chat.id)    
     await bot.send_message(message.chat.id, 'Введите имя игрока')
-
-
+    
+    
 @bot.message_handler(state=MyStates.skater)
+async def get_goalies(message):
+    keys = ["Домашняя", "Выездная"]
+    markup = ReplyKeyboardMarkup(resize_keyboard = True)
+    row = [KeyboardButton(x) for x in keys]
+    markup.add(*row)
+
+    await bot.set_state(message.from_user.id, MyStates.skater_game, message.chat.id)    
+    await bot.send_message(message.chat.id, 'Домашняя игра или выездная?', reply_markup=markup)
+    
+    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        data['skater'] = message.text
+
+
+@bot.message_handler(state=MyStates.skater_game)
 async def name_get(message):
     
+    home_game = {}
+    home_game['Домашняя'] = 'H'
+    home_game['Выездная'] = 'R'
+    
+    print(message.text)
+    
+    markup = telebot.types.ReplyKeyboardRemove()
+    
     df = gen_df('skaters_agg')
-    res = df[df['playersFIO'] == message.text].iloc[1].to_dict()
+    res = ''
+    
+    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        res = df[(df['playersFIO'] == data['skater']) & (df['homeRoadFlag'] == home_game[message.text])].iloc[0].to_dict()
     ans = 'Дата рождения: ' + res['birthDate'] + '\n'
     ans += 'Страна: ' + res['birthCountry'] + '\n'
     ans += 'Город: ' + res['birthCity'] + '\n'
     ans += 'Игр: ' + str(res['gamesCNT']) + '\n'
     ans += 'Голов: ' + str(res['goals']) + '\n'
     
-    await bot.send_message(message.chat.id, ans)
+    await bot.send_message(message.chat.id, ans,  reply_markup=markup)
+    
+    await bot.send_message(message.chat.id, '''Более подробную информация можете посмотреть в нашем [Дэшбордике по игрокам](https://datalens.yandex/xqnhz02g6x6ml)\!''', parse_mode='MarkdownV2')
+    
     await bot.delete_state(message.from_user.id, message.chat.id)
     
 
