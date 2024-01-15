@@ -11,7 +11,7 @@ import pyspark.sql.functions as sf
 
 
 DEFAULT_ARGS = {
-    "owner": "Maxim Galanov",
+    "owner": "Galanov, Shiryeava, Boyarkin",
     "email": "maxglnv@gmail.com",
     "email_on_failure": True,
     "email_on_retry": False,
@@ -330,6 +330,38 @@ def goalies_agg_dwh(**kwargs):
         DWH_PATH + f"goalies_agg"
     )
 
+def agg_dwh_to_postgresql(**kwargs):
+
+    spark = SparkSession.builder.config("spark.jars", "/opt/hadoop/airflow/dags/galanov/postgresql-42.2.27.jre7.jar")\
+        .appName("to_postgres")\
+        .getOrCreate()
+
+    df_skaters_agg = spark.read.parquet(DWH_PATH + f"skaters_agg")
+
+    df_skaters_agg.write.mode('overwrite')\
+        .format("jdbc")\
+        .option("url", "jdbc:postgresql://rc1b-diwt576i60sxiqt8.mdb.yandexcloud.net:6432/hse_db")\
+        .option("driver", "org.postgresql.Driver").option("dbtable", "public.skaters_agg")\
+        .option("user", "maxglnv").option("password", "hse_12345")\
+        .save()
+
+    df_goalies_agg = spark.read.parquet(DWH_PATH + f"goalies_agg")
+    df_goalies_agg.write.mode('overwrite')\
+        .format("jdbc")\
+        .option("url", "jdbc:postgresql://rc1b-diwt576i60sxiqt8.mdb.yandexcloud.net:6432/hse_db")\
+        .option("driver", "org.postgresql.Driver").option("dbtable", "public.goalies_agg")\
+        .option("user", "maxglnv").option("password", "hse_12345")\
+        .save()
+    
+    df_players_games_datamart = spark.read.parquet(DWH_PATH + f"players_games_datamart")
+
+    df_players_games_datamart.write.mode('overwrite')\
+        .format("jdbc")\
+        .option("url", "jdbc:postgresql://rc1b-diwt576i60sxiqt8.mdb.yandexcloud.net:6432/hse_db")\
+        .option("driver", "org.postgresql.Driver").option("dbtable", "public.players_games_datamart")\
+        .option("user", "maxglnv").option("password", "hse_12345")\
+        .save()
+
 
 task_get_players_info = PythonOperator(
     task_id="get_players_info",
@@ -373,6 +405,14 @@ task_goalies_agg_dwh = PythonOperator(
     dag=dag,
 )
 
+task_agg_dwh_to_postgresql = PythonOperator(
+    task_id="agg_dwh_to_postgresql",
+    python_callable=agg_dwh_to_postgresql,
+    dag=dag,
+)
+
 
 task_get_players_info >> task_players_info_to_dwh >> task_get_games_info >> task_games_info_to_dwh >> task_players_games_datamart_dwh
 task_players_games_datamart_dwh >> [task_skaters_agg_dwh, task_goalies_agg_dwh]
+task_skaters_agg_dwh >> task_agg_dwh_to_postgresql
+task_goalies_agg_dwh >> task_agg_dwh_to_postgresql

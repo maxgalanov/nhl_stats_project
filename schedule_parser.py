@@ -9,7 +9,7 @@ from pyspark.sql.functions import col
 import json
 
 DEFAULT_ARGS = {
-    "owner": "Maxim Galanov",
+    "owner": "Galanov, Shiryeava, Boyarkin",
     "email": "maxglnv@gmail.com",
     "email_on_failure": True,
     "email_on_retry": False,
