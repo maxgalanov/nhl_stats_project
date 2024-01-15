@@ -19,12 +19,12 @@ DEFAULT_ARGS = {
 
 dag = DAG(
     dag_id="nhl_schedule",
-    schedule_interval="0 0 1 10 *",
+    schedule_interval="30 3 * * *",
     start_date=days_ago(2),
     catchup=False,
     tags=["hse_big_data_nhl"],
     default_args=DEFAULT_ARGS,
-    description="ETL process for getting list of NHL teams yearly before every season",
+    description="Get last results",
 )
 
 RAW_PATH = "/user/maxglnv/data/raw/"
@@ -81,6 +81,21 @@ def shedule_to_dwh(**kwargs):
                                    col("home_teams"), col("away_result"), col("home_result"), col("date_play"))
     df_shedule.repartition(1).write.mode("overwrite").parquet(DWH_PATH + f"shedule")
 
+def dwh_to_postgresql(**kwargs):
+
+    spark = SparkSession.builder.config("spark.jars", "/opt/hadoop/airflow/dags/galanov/postgresql-42.2.27.jre7.jar")\
+        .appName("to_postgres")\
+        .getOrCreate()
+
+    df_shedule = spark.read.parquet(DWH_PATH + f"shedule")
+
+    df_shedule.write.mode('overwrite')\
+        .format("jdbc")\
+        .option("url", "jdbc:postgresql://rc1b-diwt576i60sxiqt8.mdb.yandexcloud.net:6432/hse_db")\
+        .option("driver", "org.postgresql.Driver").option("dbtable", "public.shedule")\
+        .option("user", "maxglnv").option("password", "hse_12345")\
+        .save()
+
 
 task_get_shedule = PythonOperator(
     task_id="get_shedule",
@@ -94,4 +109,11 @@ task_shedule_to_dwh = PythonOperator(
     dag=dag,
 )
 
-task_get_shedule >> task_shedule_to_dwh
+task_dwh_to_postgresql = PythonOperator(
+    task_id="dwh_to_postgresql",
+    python_callable=dwh_to_postgresql,
+    dag=dag,
+)
+
+
+task_get_shedule >> task_shedule_to_dwh >> task_dwh_to_postgresql
