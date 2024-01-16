@@ -18,7 +18,7 @@ DEFAULT_ARGS = {
 
 dag = DAG(
     dag_id="nhl_teams",
-    schedule_interval="0 0 1 10 *",
+    schedule_interval="45 5 1 10 *",
     start_date=days_ago(2),
     catchup=False,
     tags=["hse_big_data_nhl"],

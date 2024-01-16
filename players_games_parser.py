@@ -21,7 +21,7 @@ DEFAULT_ARGS = {
 
 dag = DAG(
     dag_id="nhl_players_games",
-    schedule_interval="30 2 * * *",
+    schedule_interval="30 3 * * *",
     start_date=days_ago(2),
     catchup=False,
     tags=["hse_big_data_nhl"],
@@ -207,7 +207,7 @@ def players_games_datamart_dwh(**kwargs):
     df_games_info = spark.read.parquet(DWH_PATH + f"games_info")
 
     df_games_info = df_games_info.join(df_players_info, "playerId", "left")\
-                            .drop("headshot", "commonName", "opponentCommonName")\
+                            .drop("commonName", "opponentCommonName")\
                             .join(df_teams.select("triCode", "fullName"), df_games_info.teamAbbrev == df_teams.triCode, "left")\
                             .drop("triCode").withColumnRenamed("fullName", "teamFullName")\
                             .join(df_teams.select("triCode", "fullName"), df_games_info.opponentAbbrev == df_teams.triCode, "left")\
@@ -244,6 +244,7 @@ def skaters_agg_dwh(**kwargs):
         .withColumn("toi", convert_to_seconds_udf("toi"))\
         .groupBy(
             "playerId",
+            "headshot",
             "playersFIO",
             "triCodeCurrent",
             "currentTeamFullName",
@@ -301,6 +302,7 @@ def goalies_agg_dwh(**kwargs):
         .withColumn("toi", convert_to_seconds_udf("toi"))\
         .groupBy(
             "playerId",
+            "headshot",
             "playersFIO",
             "triCodeCurrent",
             "currentTeamFullName",
@@ -316,6 +318,7 @@ def goalies_agg_dwh(**kwargs):
         ).agg(
             sf.count("gameId").alias("gamesCNT"),
             sf.sum("goals").alias("goals"),
+            sf.sum("points").alias("points"),
             sf.sum("gamesStarted").alias("gamesStarted"),
             sf.sum("shotsAgainst").alias("shotsAgainst"),
             sf.sum("goalsAgainst").alias("goalsAgainst"),
