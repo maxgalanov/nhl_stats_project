@@ -183,7 +183,7 @@ async def get_stats(message):
     
     await bot.send_message(message.chat.id, ans, reply_markup=markup)
     
-    await bot.send_message(message.chat.id, '''Более подробную информация можете посмотреть в нашем [дашборде по игрокам](https://datalens.yandex/xqnhz02g6x6ml?tab=lD)''', parse_mode='MarkdownV2')
+    await bot.send_message(message.chat.id, f'''Более подробную информация можете посмотреть в нашем [дашборде по игрокам](https://datalens.yandex/xqnhz02g6x6ml?tab=lD&playersfio_d7s6={data['name'].split(' ')[0]}%20{data['name'].split(' ')[1]})''', parse_mode='MarkdownV2')
     
     await bot.delete_state(message.from_user.id, message.chat.id)
         
