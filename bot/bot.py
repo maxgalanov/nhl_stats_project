@@ -230,7 +230,7 @@ async def get_goalies(message):
     
     
     await bot.set_state(message.from_user.id, MyStates.datalens, message.chat.id)
-    await bot.send_message(message.chat.id, f'[Дашборд в DataLens]({res})', parse_mode='MarkdownV2')
+    await bot.send_message(message.chat.id, f'[Дашборд в DataLens]({res})', parse_mode='MarkdownV2', reply_markup=markup)
     
     
     
@@ -250,4 +250,10 @@ bot.set_my_commands([
 
 asyncio.run(bot.polling())
 
-
+# Расписание
+# Любимая команда
+# К ней последние игры 
+# К ней расписание на ближайшую неделю
+# Показать стату игрока в даталенс(?)
+# Параметры для игрока 
+# Свежую статистику по новым матчам
