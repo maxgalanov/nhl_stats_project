@@ -217,7 +217,7 @@ async def cancel(message):
 
 @bot.message_handler(commands=["datalens"])
 async def get_datalens(message):
-    keys = ["Игроки на карте", "Форварды и защитники", "Вратари", "Статистика игрока"]
+    keys = ["Игроки на карте", "Форварды и защитники", "Вратари", "Статистика полевого игрока", "Статистика вратаря"]
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     row = [KeyboardButton(x) for x in keys]
     markup.add(*row)
