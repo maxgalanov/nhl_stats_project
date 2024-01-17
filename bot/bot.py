@@ -234,7 +234,8 @@ async def get_datalens(message):
     datalens_type["Игроки на карте"] = "7pV"
     datalens_type["Форварды и защитники"] = "LD"
     datalens_type["Вратари"] = "Re"
-    datalens_type["Статистика игрока"] = "lD"
+    datalens_type["Статистика полевого игрока"] = "lD"
+    datalens_type["Статистика вратаря"] = "24G"
 
     res = "https://datalens.yandex/xqnhz02g6x6ml?tab="
     res += datalens_type[message.text]
