@@ -2,6 +2,9 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import asyncio
 
+# from pathlib import Path
+import config
+
 import telebot
 import pandas as pd
 import numpy as np
@@ -14,8 +17,7 @@ from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 
 
-token = "5793916142:AAEULZu3GI9DiznLRL9DoH0djJy8zDFqWKI"
-bot = AsyncTeleBot(token, state_storage=StateMemoryStorage())
+bot = AsyncTeleBot(config.token, state_storage=StateMemoryStorage())
 
 
 class PlayerStates(StatesGroup):
@@ -23,16 +25,16 @@ class PlayerStates(StatesGroup):
     name = State()
     datalens = State()
 
-
+    
 def gen_df(table):
     conn = psycopg2.connect(
-        """
-    host=rc1b-diwt576i60sxiqt8.mdb.yandexcloud.net
-    port=6432
+        f"""
+    host={config.postgre['host']}
+    port={config.postgre['port']}
     sslmode=verify-full
-    dbname=hse_db
-    user=zendeer
-    password=hse_12345
+    dbname={config.postgre['dbname']}
+    user={config.postgre['user']}
+    password={config.postgre['passwd']}
     target_session_attrs=read-write
 """
     )
