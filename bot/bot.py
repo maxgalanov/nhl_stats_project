@@ -147,13 +147,13 @@ async def get_stats(message):
     ans += 'Штрафных минут за сезон: ' + str(int(res['pim'])) + '\n'
     
     await bot.send_message(message.chat.id, ans, reply_markup=markup)
-    await bot.send_message(message.chat.id, f'''Более подробную информация можете посмотреть в нашем [дашборде по игрокам](https://datalens.yandex/xqnhz02g6x6ml?tab=lD&playersfio_d7s6={data['name'].split(' ')[0]}%20{data['name'].split(' ')[1]})''', parse_mode='MarkdownV2')
+    await bot.send_message(message.chat.id, f'''Более подробную информацию можете посмотреть в нашем [дашборде по игрокам](https://datalens.yandex/xqnhz02g6x6ml?tab=lD&playersfio_d7s6={data['name'].split(' ')[0]}%20{data['name'].split(' ')[1]})''', parse_mode='MarkdownV2')
     await bot.delete_state(message.from_user.id, message.chat.id)
         
 
 @bot.message_handler(state="*", commands=['cancel'])
 async def cancel(message):
-    await bot.send_message(message.chat.id, "Your state was cancelled.")
+    await bot.send_message(message.chat.id, "Отмена")
     await bot.delete_state(message.from_user.id, message.chat.id)
     
     
