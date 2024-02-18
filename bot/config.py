@@ -1,3 +1,5 @@
+# Мы не заморачивались с безопастностью, так как проект учебный :)
+
 postgre = {
     "host": "rc1b-diwt576i60sxiqt8.mdb.yandexcloud.net",
     "port": "6432",
